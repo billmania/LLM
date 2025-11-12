@@ -1,0 +1,4 @@
+llama-cpp-python>=0.2.0
+sentence-transformers>=2.2.2
+qdrant-client>=1.7.0
+flask>=3.0.0

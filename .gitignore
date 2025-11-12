@@ -3,6 +3,9 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+sdkmanager_2.3.0-12626_amd64.deb
+llm_env/
+
 # C extensions
 *.so
 
