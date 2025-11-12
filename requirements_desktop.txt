@@ -1,7 +1,7 @@
 pymupdf>=1.23.0
 python-docx
 odfpy>=1.4.1
-sentence-transformers>=2.2.2
+sentence-transformers>=5.1.2
 qdrant-client>=1.7.0
 torch>=2.0.0
 tqdm>=4.65.0
