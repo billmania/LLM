@@ -14,6 +14,10 @@ class TextChunker:
 
     def chunk_text(self, text: str, doc_metadata: Dict) -> List[Dict]:
         """Split text into overlapping chunks."""
+        if type(text) is not str:
+            print(
+                f'chunk_test: WARNING: Not str type: {text}'
+            )
         words = text.split()
         chunks = []
 
@@ -29,9 +33,17 @@ class TextChunker:
         return chunks
 
     def process_documents(self, input_file: Path, output_file: Path):
-        """Chunk all documents and save."""
+        """Chunk all documents and save.
+
+        input_file is expected to contain the extracted documents as JSON
+        objects.
+        output_file is where the chunks will be written.
+        """
         all_chunks = []
 
+        print(
+            f'Processing extracted documents from {input_file}'
+        )
         with open(input_file, 'r') as f:
             for line in f:
                 doc = json.loads(line)
@@ -49,5 +61,5 @@ class TextChunker:
             for chunk in all_chunks:
                 f.write(json.dumps(chunk) + '\n')
 
-        print(f'Created {len(all_chunks)} chunks -> {output_file}')
+        print(f'Created {len(all_chunks)} chunks in {output_file}')
         return len(all_chunks)

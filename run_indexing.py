@@ -4,8 +4,9 @@ import sys
 from pathlib import Path
 
 from config import (
-    CHUNK_OVERLAP, CHUNK_SIZE, EMBEDDING_BATCH_SIZE, EMBEDDING_MODEL,
-    PROCESSED_DIR, QDRANT_COLLECTION, RAW_DIR, VECTOR_DB_DIR
+    CHUNKS_FILE, CHUNK_OVERLAP, CHUNK_SIZE, DOCUMENTS_FILE,
+    EMBEDDING_BATCH_SIZE, EMBEDDING_MODEL, PROCESSED_DIR,
+    QDRANT_COLLECTION, RAW_DIR, VECTOR_DB_DIR
 )
 
 from indexing.chunk import TextChunker
@@ -26,8 +27,8 @@ def main():
     print('\n[2/3] Chunking documents...')
     chunker = TextChunker(chunk_size=CHUNK_SIZE, overlap=CHUNK_OVERLAP)
     num_chunks = chunker.process_documents(
-        PROCESSED_DIR / 'extracted_documents.jsonl',
-        PROCESSED_DIR / 'chunks.jsonl'
+        PROCESSED_DIR / DOCUMENTS_FILE,
+        PROCESSED_DIR / CHUNKS_FILE
     )
 
     print('\n[3/3] Generating embeddings and indexing...')

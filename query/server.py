@@ -92,6 +92,7 @@ def query():
 
     # Generate answer
     answer = generator.generate(query_text, context_chunks)
+    print(f'Answer: {answer}')
 
     return jsonify({
         'answer': answer,

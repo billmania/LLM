@@ -1,10 +1,12 @@
 """Extract the text from the file."""
 import mailbox
+import unicodedata
 from json import dumps
 from pathlib import Path
+from re import sub as substitute
 from typing import Dict, List
 
-from config import PDF_MIN_WORDS
+from config import DOCUMENTS_FILE, PDF_MIN_WORDS
 
 from docx import Document
 
@@ -14,8 +16,64 @@ from odf.opendocument import load as odf_load
 import pymupdf
 
 
+def clean_text(text: str) -> str:
+    """Remove problematic characters that confuse LLMs."""
+    print(f'clean_text: Before {len(text)}')
+
+    # Replace all Unicode capatibility characters with their equivalent
+    text = unicodedata.normalize('NFKD', text)
+    print(f'clean_text: After NFKD {len(text)}')
+
+    # Replace common math symbols with text equivalents
+    replacements = {
+        '≤': '<=',
+        '≥': '>=',
+        '≠': '!=',
+        '±': '+/-',
+        '×': 'x',
+        '÷': '/',
+        '∑': 'sum',
+        '∫': 'integral',
+        '√': 'sqrt',
+        '∞': 'infinity',
+        '∂': 'partial',
+        '∆': 'delta',
+        'α': 'alpha',
+        'β': 'beta',
+        'γ': 'gamma',
+        'θ': 'theta',
+        'λ': 'lambda',
+        'μ': 'mu',
+        'σ': 'sigma',
+        'π': 'pi',
+    }
+    for symbol, replacement in replacements.items():
+        text = text.replace(symbol, replacement)
+    print(f'clean_text: After math symbols {len(text)}')
+
+    # Remove non-printable characters and control characters
+    text = ''.join(
+        char for char in text if unicodedata.category(char)[0] != 'C'
+    )
+    print(f'clean_text: After non-printables {len(text)}')
+
+    # Keep only ASCII plus common punctuation
+    text = ''.join(
+        char if ord(char) < 128 or char in '""''—–' else ' ' for char in text
+    )
+    print(f'clean_text: After only ASCII {len(text)}')
+
+    text = substitute(r'\s+', ' ', text)
+    print(f'clean_text: After collapsing SPACEs {len(text)}')
+
+    return text.strip()
+
+
 class DocumentExtractor:
-    """Extract text from a document."""
+    """Extract text from a document.
+
+    The results are written to the file extracted_documents.jsonl.
+    """
 
     def __init__(self, processed_dir: Path):
         """Initialize the attributes."""
@@ -32,13 +90,20 @@ class DocumentExtractor:
 
         if word_count < PDF_MIN_WORDS:
             doc.close()
+            print(
+                f'Less than {PDF_MIN_WORDS} found'
+                f' in {pdf_path}'
+            )
             return None
 
         text = ''
         for page in doc:
             text += page.get_text()
-
+        text = clean_text(text)
         pages = len(doc)
+        print(
+            f'extract_pdf: {pdf_path}, {pages} pages>'
+        )
         doc.close()
 
         return {
@@ -111,6 +176,7 @@ class DocumentExtractor:
         for idx in range(len(mbox)):
             try:
                 message = mbox[idx]
+
             except Exception as e:
                 print(f'Exception extracting message {idx}: {e}')
                 continue
@@ -137,7 +203,7 @@ class DocumentExtractor:
 
                 body = self.clean_email_body(body)
 
-                if body:  # Only include messages with content
+                if body:
                     messages.append({
                         'source': f'{mbox_path.name}::{idx}',
                         'type': 'email',
@@ -148,6 +214,7 @@ class DocumentExtractor:
                             'date': date
                         }
                     })
+
             except Exception as e:
                 print(f'Error processing message {idx} in {mbox_path}: {e}')
                 continue
@@ -158,7 +225,6 @@ class DocumentExtractor:
         """Process all documents and save to processed directory."""
         all_docs = []
 
-        # Process PDFs
         print('Processing PDFs...')
         for pdf_path in (raw_dir / 'pdfs').glob('*.pdf'):
             doc = self.extract_pdf(pdf_path)
@@ -188,7 +254,7 @@ class DocumentExtractor:
             messages = self.extract_mbox(mbox_path)
             all_docs.extend(messages)
 
-        output_file = self.processed_dir / 'extracted_documents.jsonl'
+        output_file = self.processed_dir / DOCUMENTS_FILE
         with open(output_file, 'w') as f:
             for doc in all_docs:
                 f.write(dumps(doc) + '\n')

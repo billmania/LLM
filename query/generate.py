@@ -19,28 +19,28 @@ class ResponseGenerator:
 
     def generate(self, query: str, context_chunks: List[str]) -> str:
         """Generate response using retrieved context."""
-        # Build context
         context = '\n\n'.join([f'Document {i+1}:\n{chunk}'
                               for i, chunk in enumerate(context_chunks)])
 
-        # Build prompt
         prompt = (
-            'Based on the following documents, answer the question.'
-            ' If the answer cannot be found in the documents, say so.\n'
-            ' Documents:\n'
-            f'  {context}\n'
-            '\n'
-            ' Question:\n'
-            f'  {query}\n'
-            '\n'
-            ' Answer:\n'
+            f"""[INST] Based on the following documents, answer the question
+briefly.
+
+{context}
+
+Question: {query} [/INST]"""
         )
+
+        print('=== FULL CONTEXT BEING SENT ===')
+        print(context)
+        print('=== END CONTEXT ===')
+        print('"\nTotal prompt length: {len(prompt)} characters')
 
         response = self.llm(
             prompt,
             max_tokens=512,
             temperature=0.7,
-            stop=['Question:', '\n\n']
+            stop=['[/INST]', '</s>']
         )
 
         return response['choices'][0]['text'].strip()
