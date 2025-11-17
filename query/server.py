@@ -2,7 +2,12 @@
 from pathlib import Path
 
 from config import (
-    CLEAR_CONTEXT, EMBEDDING_MODEL, NO_RAG, QDRANT_COLLECTION, TOP_K_RESULTS
+    CLEAR_CONTEXT,
+    EMBEDDING_MODEL,
+    NO_RAG,
+    QDRANT_COLLECTION,
+    RELEVANCE_THRESHOLD,
+    TOP_K_RESULTS
 )
 
 from flask import Flask, jsonify, render_template_string, request
@@ -95,19 +100,13 @@ def query():
         return jsonify({'error': 'No query provided'}), 400
 
     try:
-        if query_text.find(NO_RAG) == 0:
-            context_chunks = []
-            sources = []
-            query_text = query_text[len(NO_RAG):]
-        else:
-            local_context = searcher.search(query_text, top_k=TOP_K_RESULTS)
-            context_chunks = [r.payload['text'] for r in local_context]
-            sources = [{'source': r.payload['metadata']['source'],
-                        'score': r.score} for r in local_context]
+        clear_context = True if query_text.find(CLEAR_CONTEXT) == 0 else False
+        if clear_context:
+            query_text = query_text[len(CLEAR_CONTEXT):]
 
     except Exception as e:
         print(
-            f'Exception while checking for NO_RAG: {e}'
+            f'Exception while checking for CLEAR_CONTEXT: {e}'
         )
         return jsonify({
             'answer': '',
@@ -115,11 +114,38 @@ def query():
         })
 
     try:
-        clear_context = True if query_text.find(CLEAR_CONTEXT) == 0 else False
+        if query_text.find(NO_RAG) == 0:
+            context_chunks = []
+            sources = []
+            query_text = query_text[len(NO_RAG):]
+        else:
+            results = searcher.search(query_text, top_k=TOP_K_RESULTS)
+            relevant_results = [
+                result for result in results
+                if result.score > RELEVANCE_THRESHOLD
+            ]
+
+            if not relevant_results:
+                print(
+                    'No relevant results'
+                    f' (best score: {results[0].score if results else 0})'
+                )
+                answer = generator.generate(query_text, [], clear_context)
+                return jsonify({
+                    'answer': answer,
+                    'sources': [],
+                    'note': 'Answer generated without document context'
+                })
+
+            context_chunks = [
+                result.payload['text'] for result in relevant_results
+            ]
+            sources = [{'source': result.payload['metadata']['source'],
+                        'score': result.score} for result in relevant_results]
 
     except Exception as e:
         print(
-            f'Exception while checking for CLEAR_CONTEXT: {e}'
+            f'Exception while checking for NO_RAG: {e}'
         )
         return jsonify({
             'answer': '',

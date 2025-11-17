@@ -24,3 +24,4 @@ LLM_MODEL_FILE = 'mistral-7b-instruct-v0.2.Q4_K_M.gguf'
 
 QDRANT_COLLECTION = 'documents'
 TOP_K_RESULTS = 5
+RELEVANCE_THRESHOLD = 0.7
