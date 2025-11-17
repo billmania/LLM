@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from config import (
-    EMBEDDING_MODEL, NO_RAG, QDRANT_COLLECTION, TOP_K_RESULTS
+    CLEAR_CONTEXT, EMBEDDING_MODEL, NO_RAG, QDRANT_COLLECTION, TOP_K_RESULTS
 )
 
 from flask import Flask, jsonify, render_template_string, request
@@ -83,7 +83,7 @@ def query():
     add any local context to it before generating an answer.
 
     If the query begins with the CLEAR_CONTEXT sequence,
-    clear the LLM's context before generating and answer.
+    clear the LLM's context before generating an answer.
 
     Otherwise, retrieve local context and send it with the query
     to the LLM.
@@ -114,7 +114,19 @@ def query():
             'sources': []
         })
 
-    answer = generator.generate(query_text, context_chunks)
+    try:
+        clear_context = True if query_text.find(CLEAR_CONTEXT) == 0 else False
+
+    except Exception as e:
+        print(
+            f'Exception while checking for CLEAR_CONTEXT: {e}'
+        )
+        return jsonify({
+            'answer': '',
+            'sources': []
+        })
+
+    answer = generator.generate(query_text, context_chunks, clear_context)
     print(f'Answer: {answer}')
 
     return jsonify({

@@ -17,7 +17,12 @@ class ResponseGenerator:
             verbose=False
         )
 
-    def generate(self, query: str, context_chunks: List[str]) -> str:
+    def generate(
+        self,
+        query: str,
+        context_chunks: List[str],
+        clear_model_context: bool = False
+    ) -> str:
         """Generate response using retrieved context."""
         context = '\n\n'.join([f'Document {i+1}:\n{chunk}'
                               for i, chunk in enumerate(context_chunks)])
@@ -31,10 +36,15 @@ briefly.
 Question: {query} [/INST]"""
         )
 
-        print('=== FULL CONTEXT BEING SENT ===')
-        print(context)
-        print('=== END CONTEXT ===')
-        print('"\nTotal prompt length: {len(prompt)} characters')
+        if clear_model_context:
+            print('Resetting the model')
+            self.llm.reset()
+
+        print(
+            f'Context size: {self.llm.n_ctx()}\n'
+            f'Embed size: {self.llm.n_embd()}\n'
+            f'Vocabulary size: {self.llm.n_vocab()}\n'
+        )
 
         response = self.llm(
             prompt,

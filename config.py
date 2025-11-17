@@ -14,6 +14,7 @@ CHUNK_OVERLAP = 50
 
 PDF_MIN_WORDS = 5  # Skip PDFs with fewer words (likely scans)
 NO_RAG = '/NO_RAG '
+CLEAR_CONTEXT = '/CLEAR '
 
 EMBEDDING_MODEL = 'BAAI/bge-large-en-v1.5'
 EMBEDDING_BATCH_SIZE = 16  # Adjust for GTX 1060 VRAM
