@@ -1,7 +1,9 @@
 """Run the server."""
 from pathlib import Path
 
-from config import EMBEDDING_MODEL, QDRANT_COLLECTION, TOP_K_RESULTS
+from config import (
+    EMBEDDING_MODEL, NO_RAG, QDRANT_COLLECTION, TOP_K_RESULTS
+)
 
 from flask import Flask, jsonify, render_template_string, request
 
@@ -75,22 +77,43 @@ def index():
 
 @app.route('/query', methods=['POST'])
 def query():
-    """Get the query."""
+    """Process the query.
+
+    If the query begins with the NO_RAG sequence, don't
+    add any local context to it before generating an answer.
+
+    If the query begins with the CLEAR_CONTEXT sequence,
+    clear the LLM's context before generating and answer.
+
+    Otherwise, retrieve local context and send it with the query
+    to the LLM.
+    """
     data = request.json
     query_text = data.get('query', '')
 
     if not query_text:
         return jsonify({'error': 'No query provided'}), 400
 
-    # Search for relevant chunks
-    results = searcher.search(query_text, top_k=TOP_K_RESULTS)
+    try:
+        if query_text.find(NO_RAG) == 0:
+            context_chunks = []
+            sources = []
+            query_text = query_text[len(NO_RAG):]
+        else:
+            local_context = searcher.search(query_text, top_k=TOP_K_RESULTS)
+            context_chunks = [r.payload['text'] for r in local_context]
+            sources = [{'source': r.payload['metadata']['source'],
+                        'score': r.score} for r in local_context]
 
-    # Extract text and sources
-    context_chunks = [r.payload['text'] for r in results]
-    sources = [{'source': r.payload['metadata']['source'],
-                'score': r.score} for r in results]
+    except Exception as e:
+        print(
+            f'Exception while checking for NO_RAG: {e}'
+        )
+        return jsonify({
+            'answer': '',
+            'sources': []
+        })
 
-    # Generate answer
     answer = generator.generate(query_text, context_chunks)
     print(f'Answer: {answer}')
 

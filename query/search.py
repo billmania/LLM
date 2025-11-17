@@ -16,13 +16,22 @@ class VectorSearcher:
         self.collection_name = collection_name
 
     def search(self, query: str, top_k: int = 5):
-        """Search for relevant chunks."""
+        """Search for relevant chunks.
+
+        Returns top_k matching vectors, which may not be the
+        closest matches.
+        """
         query_embedding = self.model.encode(query)
 
         results = self.client.search(
             collection_name=self.collection_name,
             query_vector=query_embedding.tolist(),
             limit=top_k
+        )
+
+        print(
+            'VectorSearcher::search: results\n'
+            f'{results}'
         )
 
         return results
