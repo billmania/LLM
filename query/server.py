@@ -88,7 +88,7 @@ def query():
     add any local context to it before generating an answer.
 
     If the query begins with the CLEAR_CONTEXT sequence,
-    clear the LLM's context before generating an answer.
+    reset the model before generating an answer.
 
     Otherwise, retrieve local context and send it with the query
     to the LLM.
@@ -103,6 +103,7 @@ def query():
         clear_context = True if query_text.find(CLEAR_CONTEXT) == 0 else False
         if clear_context:
             query_text = query_text[len(CLEAR_CONTEXT):]
+            print('Reset the model')
 
     except Exception as e:
         print(
@@ -128,7 +129,7 @@ def query():
             if not relevant_results:
                 print(
                     'No relevant results'
-                    f' (best score: {results[0].score if results else 0})'
+                    f', best score: {results[0].score if results else 0}'
                 )
                 answer = generator.generate(query_text, [], clear_context)
                 return jsonify({
@@ -153,7 +154,6 @@ def query():
         })
 
     answer = generator.generate(query_text, context_chunks, clear_context)
-    print(f'Answer: {answer}')
 
     return jsonify({
         'answer': answer,

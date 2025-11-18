@@ -29,9 +29,4 @@ class VectorSearcher:
             limit=top_k
         )
 
-        print(
-            'VectorSearcher::search: results\n'
-            f'{results}'
-        )
-
         return results
