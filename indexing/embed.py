@@ -1,6 +1,7 @@
 """Embed the text."""
 import json
 from pathlib import Path
+from shutil import rmtree
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
@@ -35,6 +36,12 @@ class EmbeddingIndexer:
         )
 
         try:
+            if self.client.collection_exists(self.collection_name):
+                rmtree(
+                    path=db_path / self.collection_name,
+                    ignore_errors=True
+                )
+
             self.client.create_collection(
                 collection_name=collection_name,
                 vectors_config=VectorParams(
@@ -45,7 +52,7 @@ class EmbeddingIndexer:
             print(f'Created collection: {collection_name}')
 
         except Exception as e:
-            print(f'Exception with create_collection(): {e}')
+            print(f'Exception creating the collection: {type(e)}:{e}')
 
     def embed_and_index(self, chunks_file: Path, batch_size: int = 32):
         """Generate embeddings and index all chunks."""

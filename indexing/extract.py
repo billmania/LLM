@@ -6,23 +6,21 @@ from pathlib import Path
 from re import sub as substitute
 from typing import Dict, List
 
-from config import DOCUMENTS_FILE, PDF_MIN_WORDS
+from config import DOCUMENTS_FILE
 
 from docx import Document
 
 from odf import text as odf_text
 from odf.opendocument import load as odf_load
 
-import pymupdf
+import pymupdf4llm
 
 
 def clean_text(text: str) -> str:
     """Remove problematic characters that confuse LLMs."""
-    print(f'clean_text: Before {len(text)}')
+    original_length = len(text)
 
-    # Replace all Unicode capatibility characters with their equivalent
     text = unicodedata.normalize('NFKD', text)
-    print(f'clean_text: After NFKD {len(text)}')
 
     # Replace common math symbols with text equivalents
     replacements = {
@@ -49,30 +47,34 @@ def clean_text(text: str) -> str:
     }
     for symbol, replacement in replacements.items():
         text = text.replace(symbol, replacement)
-    print(f'clean_text: After math symbols {len(text)}')
 
     # Remove non-printable characters and control characters
     text = ''.join(
         char for char in text if unicodedata.category(char)[0] != 'C'
     )
-    print(f'clean_text: After non-printables {len(text)}')
 
     # Keep only ASCII plus common punctuation
     text = ''.join(
         char if ord(char) < 128 or char in '""''—–' else ' ' for char in text
     )
-    print(f'clean_text: After only ASCII {len(text)}')
 
     text = substitute(r'\s+', ' ', text)
-    print(f'clean_text: After collapsing SPACEs {len(text)}')
+    text = text.strip()
 
-    return text.strip()
+    cleaned_length = len(text)
+    print(
+        'clean_text:'
+        f' Removed {original_length - cleaned_length}'
+        ' characters'
+    )
+
+    return text
 
 
 class DocumentExtractor:
-    """Extract text from a document.
+    """Extract text from a collection of documents.
 
-    The results are written to the file extracted_documents.jsonl.
+    The results are written to the single file extracted_documents.jsonl.
     """
 
     def __init__(self, processed_dir: Path):
@@ -81,39 +83,47 @@ class DocumentExtractor:
         self.processed_dir.mkdir(parents=True, exist_ok=True)
 
     def extract_pdf(self, pdf_path: Path) -> Dict:
-        """Extract text from PDF, skip if appears to be scanned."""
-        doc = pymupdf.open(pdf_path)
+        """Extract contents from PDF.
 
-        # Check first page for text content
-        first_page_text = doc[0].get_text()
-        word_count = len(first_page_text.split())
+        The content is converted to Markdown, in order to preserve
+        more of the content and to make chunking more efficient.
 
-        if word_count < PDF_MIN_WORDS:
-            doc.close()
+        This method assumes that the markdown version of the extracts
+        from the source PDF document will then be chunked using the
+        langchain.text_splitter.MarkdownTextSplitter class. If the
+        original document is well-described by the use of Markdown,
+        the chunking will hew more closely to the inherent structure
+        of the source document, instead of simply chunking based on
+        counts of characters and ignoring any structure.
+
+        https://pymupdf.readthedocs.io/en/latest/rag.html#rag-outputting-as-md
+        """
+        print(
+            f'extract_pdf: {pdf_path.name}'
+        )
+        try:
+            # TODO: Figure out how to handle headers and footers
+            markdown_text = pymupdf4llm.to_markdown(
+                pdf_path
+            )
+
+        except Exception as e:
             print(
-                f'Less than {PDF_MIN_WORDS} found'
-                f' in {pdf_path}'
+                f'PDF extraction excepted. {e}'
             )
             return None
 
-        text = ''
-        for page in doc:
-            text += page.get_text()
-        text = clean_text(text)
-        pages = len(doc)
-        print(
-            f'extract_pdf: {pdf_path}, {pages} pages>'
-        )
-        doc.close()
-
         return {
-            'source': str(pdf_path),
+            'source': pdf_path.name,
             'type': 'pdf',
-            'text': text.strip(),
-            'metadata': {'pages': pages}
+            'text': markdown_text,
+            'metadata': {
+                'source': pdf_path.name,
+                'format': 'markdown'
+            }
         }
 
-    def extract_text_file(self, txt_path: Path) -> Dict:
+    def extract_txt(self, txt_path: Path) -> Dict:
         """Extract text from plain text file."""
         with open(txt_path, 'r', encoding='utf-8', errors='ignore') as f:
             text = f.read()
@@ -204,6 +214,7 @@ class DocumentExtractor:
                 body = self.clean_email_body(body)
 
                 if body:
+                    # TODO: Add all the recipients
                     messages.append({
                         'source': f'{mbox_path.name}::{idx}',
                         'type': 'email',
@@ -221,38 +232,29 @@ class DocumentExtractor:
 
         return messages
 
-    def process_all(self, raw_dir: Path):
-        """Process all documents and save to processed directory."""
+    def process_all(self, raw_dir: Path) -> int:
+        """Process the collection of documents.
+
+        File types are determine solely by the extension. The
+        method can handle: pdf, txt, docx, odt, and mbox.
+        Each of the document types are expected to be in a sub-directory
+        of their name. For example, docx files are in the docx
+        sub-directory.
+
+        All of the documents are processed together. The
+        extracted text is written to a single file, which
+        is terribly resource intensive.
+
+        Returns the quantity of documents processed.
+        """
         all_docs = []
 
-        print('Processing PDFs...')
-        for pdf_path in (raw_dir / 'pdfs').glob('*.pdf'):
-            doc = self.extract_pdf(pdf_path)
-            if doc:
-                all_docs.append(doc)
-
-        print('Processing text files...')
-        for txt_path in (raw_dir / 'docs').glob('*.txt'):
-            all_docs.append(self.extract_text_file(txt_path))
-
-        print('Processing DOCX files...')
-        for docx_path in (raw_dir / 'docs').glob('*.docx'):
-            try:
-                all_docs.append(self.extract_docx(docx_path))
-            except Exception as e:
-                print(f'Error processing {docx_path}: {e}')
-
-        print('Processing ODT files...')
-        for odt_path in (raw_dir / 'docs').glob('*.odt'):
-            try:
-                all_docs.append(self.extract_odt(odt_path))
-            except Exception as e:
-                print(f'Error processing {odt_path}: {e}')
-
-        print('Processing mbox files...')
-        for mbox_path in (raw_dir / 'mbox').glob('*.mbox'):
-            messages = self.extract_mbox(mbox_path)
-            all_docs.extend(messages)
+        for file_type in ['pdf', 'txt', 'docx', 'odt', 'mbox']:
+            print(f'Processing {file_type}')
+            for file_path in (raw_dir / file_type).glob(f'*.{file_type}'):
+                doc = getattr(self, f'extract_{file_type}')(file_path)
+                if doc:
+                    all_docs.append(doc)
 
         output_file = self.processed_dir / DOCUMENTS_FILE
         with open(output_file, 'w') as f:

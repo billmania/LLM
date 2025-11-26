@@ -107,11 +107,12 @@ def query():
 
     except Exception as e:
         print(
-            f'Exception while checking for CLEAR_CONTEXT: {e}'
+            f'query() 1 excepted with {type(e)}:{e}'
+            f', on {query_text}'
         )
         return jsonify({
             'answer': '',
-            'sources': []
+            'sources': [f'{e}']
         })
 
     try:
@@ -138,19 +139,48 @@ def query():
                     'note': 'Answer generated without document context'
                 })
 
-            context_chunks = [
-                result.payload['text'] for result in relevant_results
-            ]
-            sources = [{'source': result.payload['metadata']['source'],
-                        'score': result.score} for result in relevant_results]
+            try:
+                context_chunks = [
+                    result.payload['text']
+                    for result in relevant_results
+                ]
+
+            except Exception as e:
+                print(
+                    f'query() 3 excepted with {type(e)}:{e}'
+                    f', assembling context_chunks from:\n {relevant_results}'
+                )
+                return jsonify({
+                    'answer': '',
+                    'sources': [f'{e}']
+                })
+
+            try:
+                sources = [
+                    {
+                        'source': result.payload['metadata']['source'],
+                        'score': result.score
+                    } for result in relevant_results
+                ]
+
+            except Exception as e:
+                print(
+                    f'query() 4 excepted with {type(e)}:{e}'
+                    f', assembling sources from:\n {relevant_results}'
+                )
+                return jsonify({
+                    'answer': '',
+                    'sources': [f'{e}']
+                })
 
     except Exception as e:
         print(
-            f'Exception while checking for NO_RAG: {e}'
+            f'query() 2 excepted with {type(e)}:{e}'
+            f', on {query_text}'
         )
         return jsonify({
             'answer': '',
-            'sources': []
+            'sources': [f'{e}']
         })
 
     answer = generator.generate(query_text, context_chunks, clear_context)

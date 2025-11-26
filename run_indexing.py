@@ -46,7 +46,6 @@ def main():
     print(f'Documents processed: {num_docs}')
     print(f'Chunks created: {num_chunks}')
     print(f'Vector DB location: {VECTOR_DB_DIR}')
-    print("\nNext: Copy {VECTOR_DB_DIR} to your Orin's USB SSD")
 
 
 if __name__ == '__main__':
