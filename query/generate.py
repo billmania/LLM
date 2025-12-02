@@ -31,16 +31,24 @@ class ResponseGenerator:
         context = '\n\n'.join([f'Document {i+1}:\n{chunk}'
                               for i, chunk in enumerate(context_chunks)])
 
-        prompt = (
-            f"""[INST] Based on the following documents, answer the question
-briefly. If there is not answer, clearly state that.
+        context_begin = '<s>' if clear_model_context else ''
 
+        prompt = (
+            f'{context_begin}'
+            f"""[INST] Based on the following documents, answer the question
+briefly. If an answer does not exist, clearly state that.
 {context}
 
-Question: {query} [/INST]"""
+Question:
+{query}[/INST]"""
         )
 
+        print(
+            'Prompt:\n'
+            f'{prompt}'
+        )
         if clear_model_context:
+            # TODO: May not be necessary with context_begin
             print('Resetting the model')
             self.llm.reset()
 
@@ -48,7 +56,7 @@ Question: {query} [/INST]"""
             prompt,
             max_tokens=256,
             temperature=0.7,
-            stop=['[/INST]', '</s>']
+            stop=['[/INST]']
         )
 
         if response['choices'][0]['text'].strip().find('##########') == 0:
