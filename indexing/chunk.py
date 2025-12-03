@@ -28,6 +28,7 @@ class TextChunker:
             chunk_words = words[i:i + self.chunk_size]
             chunk_text = ' '.join(chunk_words)
 
+            # TODO: make email message metadata available to the generator
             chunks.append({
                 'text': chunk_text,
                 'metadata': doc_metadata

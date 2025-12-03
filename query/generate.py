@@ -1,6 +1,8 @@
 """Generate responses."""
 from typing import List
 
+from config import MAX_MODEL_CONTEXT
+
 from llama_cpp import Llama
 
 
@@ -12,7 +14,7 @@ class ResponseGenerator:
         print(f'Instantiating LLM from {model_path}')
         self.llm = Llama(
             model_path=model_path,
-            n_ctx=4096,
+            n_ctx=MAX_MODEL_CONTEXT,
             n_gpu_layers=-1,
             verbose=False
         )
@@ -31,7 +33,9 @@ class ResponseGenerator:
         context = '\n\n'.join([f'Document {i+1}:\n{chunk}'
                               for i, chunk in enumerate(context_chunks)])
 
-        context_begin = '<s>' if clear_model_context else ''
+        # TODO: Determine if the "duplicate <s>" is a bug
+        # context_begin = '<s>' if clear_model_context else ''
+        context_begin = ''
 
         prompt = (
             f'{context_begin}'
@@ -48,8 +52,8 @@ Question:
             f'{prompt}'
         )
         if clear_model_context:
-            # TODO: May not be necessary with context_begin
             print('Resetting the model')
+            # TODO: Determine if this really clears the context from the LLM
             self.llm.reset()
 
         response = self.llm(
